@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Championnat du club 2025</title>
+
+<style>
+  :root {
+    --bg: #ffffff;
+    --card: #ffffff;
+    --border: #d0d7e2;
+    --muted: #6b7280;
+    --accent: #0f172a;
+    --green: #10b981;
+    --red: #dc2626;
+    --orange: #f97316;
+    --silver: #9ca3af;
+    --gold: #fbbf24;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: Inter, Arial, sans-serif;
+    background: var(--bg); margin: 0; padding: 18px;
+    color: var(--accent);
+  }
+
+  .container { max-width: 1300px; margin: auto; }
+
+  header {
+    display: flex; justify-content: space-between;
+    align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+
+  #logo { height: 50px; }
+  #title {
+    font-size: 24px; font-weight: bold; cursor: text;
+    padding-bottom: 4px; border-bottom: 2px solid transparent;
+  }
+  #title:focus { border-color: var(--green); outline: none; }
+
+  .controls button {
+    padding: 8px 14px; border-radius: 8px;
+    border: 1px solid var(--border);
+    background: #fff; cursor: pointer;
+  }
+
+  #championBox {
+    font-size: 22px; font-weight: bold;
+    margin: 15px 0; text-align: center;
+    color: var(--green);
+    animation: glow 1.5s infinite;
+  }
+  @keyframes glow {
+    0% { opacity: .5; }
+    100% { opacity: 1; }
+  }
+
+  .board { display: flex; gap: 20px; overflow-x: auto; padding-bottom: 25px; }
+
+  .round { min-width: 260px; }
+  .round h2 {
+    font-size: 15px; color: var(--muted); margin: 0 0 10px;
+  }
+
+  .match {
+    background: var(--card);
+    border: 1px solid var(--border);
+    padding: 10px; margin-bottom: 12px;
+    border-radius: 12px;
+  }
+
+  .player {
+    background: #f8fafc;
+    border-radius: 10px; padding: 8px;
+    margin-bottom: 6px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+  }
+
+  .player:hover { background: #eef2ff; }
+
+  .winner {
+    border: 2px solid var(--green) !important;
+    position: relative;
+  }
+  .winner::after {
+    content: "⭐";
+    position: absolute;
+    right: -8px; top: -8px;
+    color: var(--gold); font-size: 18px;
+  }
+
+  .field {
+    font-size: 13px;
+    margin-bottom: 4px;
+  }
+  .label {
+    font-size: 11px; color: var(--muted);
+  }
+
+  .actions { display: flex; gap: 6px; margin-top: 6px; }
+  .btn {
+    border: none; padding: 6px 10px;
+    border-radius: 6px; cursor: pointer;
+    font-size: 12px;
+  }
+  .btn-select {
+    background: var(--green); color: #fff;
+  }
+  .btn-edit {
+    background: #e5e7eb;
+  }
+
+  .adv {
+    font-size: 12px; color: var(--orange);
+    text-align: center; margin-top: 5px;
+  }
+
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<header>
+  <img id="logo" src="icon_1024x1024.png">
+  <h1 id="title" contenteditable="true">Championnat du club 2025</h1>
+  <div class="controls">
+    <button onclick="window.print()">Imprimer / PDF</button>
+    <button onclick="resetAll()" style="color:var(--red)">Réinitialiser</button>
+  </div>
+</header>
+
+<div id="championBox">🏆 Aucun champion pour le moment</div>
+
+<div class="board" id="board"></div>
+
+<footer style="text-align:center;color:var(--muted);margin-top:20px">
+  Créé par Patrick – 2025
+</footer>
+
+</div>
+
+<script>
+/* --- LOCAL STORAGE --- */
+const KEY="golf_tableau_full_v2";
+
+/* --- INITIALISATION --- */
+function newPlayers(){
+  return Array.from({length:32},(_,i)=>({
+    num:"",
+    name:"Joueur "+(i+1),
+    phone:"",
+    handicap:""
+  }));
+}
+
+function makeRounds(players){
+  const rounds=[];
+  let first=[];
+  for(let i=0;i<32;i+=2){
+    first.push({players:[players[i],players[i+1]],winner:null});
+  }
+  rounds.push(first);
+  while(first.length>1){
+    const next=[];
+    for(let i=0;i<first.length;i+=2){
+      next.push({players:[null,null],winner:null});
+    }
+    rounds.push(next);
+    first=next;
+  }
+  return rounds;
+}
+
+let rounds;
+
+/* --- CHARGEMENT --- */
+function load(){
+  const raw=localStorage.getItem(KEY);
+  if(raw){ rounds=JSON.parse(raw); return; }
+  const p=newPlayers();
+  rounds=makeRounds(p);
+  save();
+}
+
+/* --- SAUVEGARDE --- */
+function save(){
+  localStorage.setItem(KEY,JSON.stringify(rounds));
+}
+
+/* --- EDITION JOUEUR --- */
+function edit(r,m,p){
+  const pl=rounds[r][m].players[p];
+  pl.num = prompt("Numéro du joueur :", pl.num||"") ?? pl.num;
+  pl.name = prompt("Nom :", pl.name||"") ?? pl.name;
+  pl.phone = prompt("Téléphone :", pl.phone||"") ?? pl.phone;
+  pl.handicap = prompt("Handicap :", pl.handicap||"") ?? pl.handicap;
+  save(); render();
+}
+
+/* --- SÉLECTION GAGNANT --- */
+function selectWinner(r,m,p){
+  rounds[r][m].winner=p;
+
+  if(r+1<rounds.length){
+    const nextMatch=Math.floor(m/2);
+    const slot = m%2===0 ? 0:1;
+    rounds[r+1][nextMatch].players[slot] = rounds[r][m].players[p];
+    for(let i=r+1;i<rounds.length;i++)
+      for(const mm of rounds[i]) mm.winner=null;
+  }
+
+  save(); render();
+}
+
+/* --- CALCUL COUPS RENDUS --- */
+function adv(p1,p2){
+  if(!p1||!p2) return null;
+  if(!p1.handicap || !p2.handicap) return null;
+  const h1=parseFloat(p1.handicap)||0;
+  const h2=parseFloat(p2.handicap)||0;
+  const diff=Math.abs(h1-h2);
+  if(!diff) return null;
+  const val=Math.round(diff*0.75);
+  return {player:h1>h2?p1:p2, value:val};
+}
+
+/* --- AFFICHAGE --- */
+function render(){
+  const board=document.getElementById("board");
+  board.innerHTML="";
+
+  let champion=null;
+
+  rounds.forEach((round,ri)=>{
+    const col=document.createElement("div");
+    col.className="round";
+    const h=document.createElement("h2");
+    h.textContent=["32e","16e","8e","Quart","Demi","Finale"][ri]+" de finale";
+    col.appendChild(h);
+
+    round.forEach((match,mi)=>{
+      const box=document.createElement("div");
+      box.className="match";
+
+      const a=match.players[0];
+      const b=match.players[1];
+      const ad=adv(a,b);
+
+      match.players.forEach((pl,pi)=>{
+        const div=document.createElement("div");
+        div.className="player";
+        if(match.winner===pi){
+          div.classList.add("winner");
+          if(ri===rounds.length-1) champion=pl;
+        }
+
+        div.innerHTML=`
+          <div class="field"><span class="label">Numéro :</span> ${pl?.num||""}</div>
+          <div class="field"><span class="label">Nom :</span> ${pl?.name||""}</div>
+          <div class="field"><span class="label">Téléphone :</span> ${pl?.phone||""}</div>
+          <div class="field"><span class="label">Handicap :</span> ${pl?.handicap||""}</div>
+        `;
+
+        const actions=document.createElement("div");
+        actions.className="actions";
+        actions.innerHTML=`
+          <button class="btn btn-select">Sélectionner</button>
+          <button class="btn btn-edit">Éditer</button>
+        `;
+
+        actions.children[0].onclick=e=>{e.stopPropagation();selectWinner(ri,mi,pi);};
+        actions.children[1].onclick=e=>{e.stopPropagation();edit(ri,mi,pi);};
+
+        div.appendChild(actions);
+        box.appendChild(div);
+      });
+
+      if(ad){
+        const advDiv=document.createElement("div");
+        advDiv.className="adv";
+        advDiv.textContent=`${ad.player.name} reçoit ${ad.value} coups`;
+        box.appendChild(advDiv);
+      }
+
+      col.appendChild(box);
+    });
+
+    board.appendChild(col);
+  });
+
+  document.getElementById("championBox").innerHTML =
+    champion ? `🏆 Champion 2025 : <span style="color:var(--accent)">${champion.name}</span>` :
+               "🏆 Aucun champion pour le moment";
+}
+
+/* --- RESET --- */
+function resetAll(){
+  if(confirm("Effacer le tableau ?")){
+    localStorage.removeItem(KEY);
+    load(); render();
+  }
+}
+
+/* --- START --- */
+load();
+render();
+
+</script>
+
+</body>
+</html>
